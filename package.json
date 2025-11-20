@@ -9,9 +9,21 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.17.3",
+    "@remotion/cli": "^4.0.377",
+    "@remotion/player": "^4.0.377",
+    "@types/uuid": "^11.0.0",
+    "assemblyai": "^4.19.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.24",
+    "lucide-react": "^0.554.0",
     "next": "16.0.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "react-dropzone": "^14.3.8",
+    "remotion": "^4.0.377",
+    "tailwind-merge": "^3.4.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

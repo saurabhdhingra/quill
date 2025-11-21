@@ -11,11 +11,6 @@ interface ConvertResult {
     pages: TikTokCaptionPages;
 }
 
-/**
- * Parse an SRT document into Remotion Caption objects and TikTok style pages.
- * Relies on the Caption data structure described in Remotion's docs:
- * https://www.remotion.dev/docs/captions/caption
- */
 export const srtToCaptionPages = (
     srt: string,
     options: ConvertOptions = {},

@@ -15,7 +15,6 @@ export const CaptionComposition: React.FC<CaptionCompositionProps> = ({
 }) => {
     const resolvedVideoSrc = useStaticFile ? staticFile(staticSrc) : staticSrc;
 
-    // Apply basic relative styling to the main container
     return (
         <AbsoluteFill className="bg-black relative"> 
             
@@ -24,7 +23,6 @@ export const CaptionComposition: React.FC<CaptionCompositionProps> = ({
                     <OffthreadVideo src={resolvedVideoSrc} className="w-full h-full object-cover" />
                 </AbsoluteFill>
             ) : (
-                // Fallback rendering
                 <AbsoluteFill className="z-10 flex items-center justify-center text-gray-500">
                     No Video Loaded
                 </AbsoluteFill>

@@ -1,6 +1,5 @@
 import { Storage } from '@google-cloud/storage';
 
-// Initialize storage with credentials from env
 const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
   credentials: {
@@ -24,10 +23,6 @@ export const generateV4UploadSignedUrl = async (filename: string) => {
     .file(filename)
     .getSignedUrl(options);
 
-  // Determine the public URL (Assuming bucket is publicly readable or using signed read URLs later)
-  // For simplicity in this demo, we assume we can generate a read-signed-url immediately 
-  // or the bucket allows public read for the transcriber.
-  // Let's generate a read signed URL valid for 1 hour for AssemblyAI to access.
   const [readUrl] = await storage
     .bucket(bucketName)
     .file(filename)

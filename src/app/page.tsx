@@ -239,7 +239,6 @@ export default function Home() {
     URL.revokeObjectURL(tempUrl);
   };
   
-  // Function to download the SRT file
   const handleDownloadSrt = () => {
     if (!srtContent) {
       return;

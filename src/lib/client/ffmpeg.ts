@@ -18,10 +18,8 @@ export const extractWavFromVideo = async (file: File) => {
   const inputName = 'input-video.mp4';
   const outputName = 'output-audio.wav';
 
-  // Write the file to FFmpeg's in-memory filesystem
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  // Run FFmpeg to extract mono 16k wav audio suitable for Whisper
   await ffmpeg.exec([
     '-i',
     inputName,

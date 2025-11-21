@@ -268,26 +268,28 @@ export default function Home() {
               className="w-full h-full bg-black object-contain"
             />
           </div>
-        ) : showRemotionPreview && previewUrl ? (
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 relative bg-black min-h-[400px]">
-              <Player
-                component={CaptionComposition}
-                inputProps={{
-                  videoSrc: previewUrl,
-                  pages: captionPages,
-                  useStaticFile: false,
-                }}
-                durationInFrames={durationInFrames}
-                compositionWidth={WIDTH}
-                compositionHeight={HEIGHT}
-                fps={FPS}
-                style={{ width: '100%', height: '100%' }}
-                controls
-              />
-            </div>
-          </div>
-        ) : (
+        ) : 
+        // showRemotionPreview && previewUrl ? (
+        //   <div className="flex-1 flex flex-col">
+        //     <div className="flex-1 relative bg-black min-h-[400px]">
+        //       <Player
+        //         component={CaptionComposition}
+        //         inputProps={{
+        //           videoSrc: previewUrl,
+        //           pages: captionPages,
+        //           useStaticFile: false,
+        //         }}
+        //         durationInFrames={durationInFrames}
+        //         compositionWidth={WIDTH}
+        //         compositionHeight={HEIGHT}
+        //         fps={FPS}
+        //         style={{ width: '100%', height: '100%' }}
+        //         controls
+        //       />
+        //     </div>
+        //   </div>
+        // ) : 
+        (
           <div className="flex-1 p-8 flex flex-col items-center justify-center">
             <div
               {...getRootProps()}

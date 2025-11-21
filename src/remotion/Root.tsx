@@ -11,13 +11,13 @@ export const RemotionRoot: React.FC = () => (
   <>
     <Composition
       id="CaptionVideo"
-      component={CaptionComposition}
+      component={CaptionComposition as React.ComponentType<any>}
       durationInFrames={DEFAULT_DURATION}
       width={WIDTH}
       height={HEIGHT}
       fps={FPS}
       defaultProps={{
-        videoSrc: '',
+        staticSrc: '',
         pages: [],
         useStaticFile: false,
       }}

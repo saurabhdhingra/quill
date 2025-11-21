@@ -31,26 +31,33 @@ const main = async () => {
   const {
     entry,
     composition,
-    staticSrc,
     output,
-    pages: pagesPath,
+    props: propsJsonString, // 💡 NEW: Read the --props argument
     duration,
     fps,
     width,
     height,
   } = args;
 
-  if (!entry || !composition || !staticSrc || !output || !pagesPath) {
-    throw new Error('Missing required arguments for render-caption-video script.');
+  // 💡 UPDATED CHECK: Only require the essential Remotion render arguments
+  if (!entry || !composition || !output || !propsJsonString) {
+    throw new Error('Missing required arguments for render-caption-video script. Expected: --entry, --composition, --output, --props');
   }
 
-  const pages = JSON.parse(await fs.readFile(pagesPath, 'utf-8'));
+  // 💡 REMOVED: const { staticSrc, pages: pagesPath, ... } = args;
+  // 💡 REMOVED: The old check for staticSrc, output, and pagesPath
+
+  // 1. Parse the props JSON string passed from route.ts
+  const inputProps = JSON.parse(propsJsonString);
+
+  // 💡 REMOVED: const pages = JSON.parse(await fs.readFile(pagesPath, 'utf-8'));
 
   const serveUrl = await bundle(entry);
 
   try {
     const compositions = await getCompositions(serveUrl, {
-      inputProps: { videoSrc: '', pages: [], useStaticFile: true },
+      // 💡 Pass the parsed inputProps to getCompositions
+      inputProps: inputProps,
     });
 
     const targetComposition = compositions.find((c) => c.id === composition);
@@ -71,11 +78,8 @@ const main = async () => {
       serveUrl,
       codec: 'h264',
       outputLocation: output,
-      inputProps: {
-        videoSrc: staticSrc,
-        pages,
-        useStaticFile: true,
-      },
+      // 💡 Pass the parsed inputProps directly to renderMedia
+      inputProps: inputProps,
     });
   } finally {
     await fs.rm(serveUrl, { recursive: true, force: true });
@@ -86,4 +90,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

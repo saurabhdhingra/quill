@@ -40,12 +40,12 @@ export const CaptionDisplay: React.FC<CaptionDisplayProps> = ({ pages }) => {
   }
 
   return (
-    <div className="w-full flex justify-center pb-20 px-6">
+    <div className="w-full flex justify-center px-6 mb-10">
       <div className="rounded-2xl bg-black/60 backdrop-blur-md px-8 py-6 flex flex-col gap-3">
         {lines.map((line, lineIndex) => (
           <div
             key={`line-${lineIndex}-${line[0]?.fromMs ?? lineIndex}`}
-            className="flex flex-wrap justify-center gap-2 text-4xl md:text-5xl font-bold tracking-tight text-white drop-shadow-lg"
+            className="flex flex-wrap justify-center gap-3 text-6xl font-extrabold text-white drop-shadow-lg"
           >
             {line.map((token, tokenIndex) => {
               const tokenDuration = Math.max(token.toMs - token.fromMs, 1);
@@ -57,7 +57,7 @@ export const CaptionDisplay: React.FC<CaptionDisplayProps> = ({ pages }) => {
 
               return (
                 <span key={`token-${tokenIndex}-${token.text}`} className="relative inline-block">
-                  <span className="relative z-10 px-1">{token.text}</span>
+                  <span className="relative z-10 px-1">{token.text}&nbsp;</span>
                   <span
                     className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-md origin-left"
                     style={{

@@ -4,31 +4,38 @@ import { CaptionDisplay } from '../components/captions/CaptionDisplay';
 import type { TikTokCaptionPages } from '../types';
 
 interface CaptionCompositionProps {
-    videoSrc: string;
+    staticSrc: string;
     pages: TikTokCaptionPages;
     useStaticFile?: boolean;
 }
-
 export const CaptionComposition: React.FC<CaptionCompositionProps> = ({
-    videoSrc,
+    staticSrc,
     pages,
-    useStaticFile = false,
+    useStaticFile = true,
 }) => {
-    const resolvedVideoSrc = useStaticFile ? staticFile(videoSrc) : videoSrc;
+    const resolvedVideoSrc = useStaticFile ? staticFile(staticSrc) : staticSrc;
 
+    // Apply basic relative styling to the main container
     return (
-        <AbsoluteFill className="bg-black overflow-hidden relative">
-            {resolvedVideoSrc ? (
-                <OffthreadVideo src={resolvedVideoSrc} className="w-full h-full object-cover" />
+        <AbsoluteFill className="bg-black relative"> 
+            
+            {staticSrc ? (
+                <AbsoluteFill className="z-10">
+                    <OffthreadVideo src={resolvedVideoSrc} className="w-full h-full object-cover" />
+                </AbsoluteFill>
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                // Fallback rendering
+                <AbsoluteFill className="z-10 flex items-center justify-center text-gray-500">
                     No Video Loaded
-                </div>
+                </AbsoluteFill>
             )}
+            <AbsoluteFill 
 
-            <AbsoluteFill className="flex flex-col items-center justify-end pointer-events-none">
+                className="flex flex-col items-center justify-end z-20 pointer-events-none pb-10"
+            >
                 <CaptionDisplay pages={pages} />
             </AbsoluteFill>
+
         </AbsoluteFill>
     );
 };

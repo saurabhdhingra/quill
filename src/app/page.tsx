@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import  { useState, useCallback,  useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Loader2, UploadCloud, RefreshCw, Download } from 'lucide-react';
-import { Player } from '@remotion/player';
 import { clsx } from 'clsx';
 
-import { extractWavFromVideo } from '@/lib/client/ffmpeg';
-import { srtToCaptionPages } from '@/lib/captions';
-import { CaptionComposition } from '@/remotion/CaptionComposition';
-import type { TikTokCaptionPages, TranscriptionResponse } from '@/types';
+// Corrected imports using relative paths
+import { extractWavFromVideo } from '../lib/client/ffmpeg';
+import { srtToCaptionPages } from '../lib/captions';
+import type { TikTokCaptionPages, TranscriptionResponse } from '../types';
 
 const fontStyles = {
   playfair: { fontFamily: '"Playfair Display", serif' },
@@ -67,6 +66,7 @@ export default function Home() {
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
   const [renderedVideoBlob, setRenderedVideoBlob] = useState<Blob | null>(null);
   const [captionPages, setCaptionPages] = useState<TikTokCaptionPages>([]);
+  const [srtContent, setSrtContent] = useState<string | null>(null); // State for storing the SRT content
   const [durationInFrames, setDurationInFrames] = useState(FPS * 60);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,6 +132,7 @@ export default function Home() {
     async (file: File) => {
       setError(null);
       setCaptionPages([]);
+      setSrtContent(null); // Reset SRT content
       setRenderedVideoBlob(null);
       updateRenderedUrl(null);
       setState('UPLOADING');
@@ -170,9 +171,13 @@ export default function Home() {
         }
 
         const payload = (await transcriptionResponse.json()) as TranscriptionResponse;
-        const { pages } = srtToCaptionPages(payload.srt);
+        const { srt } = payload; // Destructure srt
+        const { pages } = srtToCaptionPages(srt);
+        
         setCaptionPages(pages);
-        await renderFinalVideo(file, payload.srt, computedFrames);
+        setSrtContent(srt); // Store the SRT content
+        
+        await renderFinalVideo(file, srt, computedFrames);
       } catch (processingError) {
         console.error('Processing failed:', processingError);
         setError(
@@ -184,6 +189,7 @@ export default function Home() {
         updatePreviewUrl(null);
         updateRenderedUrl(null);
         setCaptionPages([]);
+        setSrtContent(null); // Reset SRT content on error
         setRenderedVideoBlob(null);
       }
     },
@@ -210,6 +216,7 @@ export default function Home() {
 
   const handleReset = () => {
     setCaptionPages([]);
+    setSrtContent(null); // Reset SRT content
     setRenderedVideoBlob(null);
     setError(null);
     setState('IDLE');
@@ -231,6 +238,21 @@ export default function Home() {
     triggerDownload(tempUrl, 'captioned-video.mp4');
     URL.revokeObjectURL(tempUrl);
   };
+  
+  // Function to download the SRT file
+  const handleDownloadSrt = () => {
+    if (!srtContent) {
+      return;
+    }
+    
+    const srtBlob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+    const srtUrl = URL.createObjectURL(srtBlob);
+    
+    triggerDownload(srtUrl, 'captions.srt');
+    
+    URL.revokeObjectURL(srtUrl);
+  };
+  
   const showRenderedVideo = state === 'READY' && Boolean(renderedVideoUrl);
   const showRemotionPreview =
     !showRenderedVideo && Boolean(previewUrl) && captionPages.length > 0;
@@ -268,73 +290,53 @@ export default function Home() {
               className="w-full h-full bg-black object-contain"
             />
           </div>
-        ) : 
-        // showRemotionPreview && previewUrl ? (
-        //   <div className="flex-1 flex flex-col">
-        //     <div className="flex-1 relative bg-black min-h-[400px]">
-        //       <Player
-        //         component={CaptionComposition}
-        //         inputProps={{
-        //           videoSrc: previewUrl,
-        //           pages: captionPages,
-        //           useStaticFile: false,
-        //         }}
-        //         durationInFrames={durationInFrames}
-        //         compositionWidth={WIDTH}
-        //         compositionHeight={HEIGHT}
-        //         fps={FPS}
-        //         style={{ width: '100%', height: '100%' }}
-        //         controls
-        //       />
-        //     </div>
-        //   </div>
-        // ) : 
-        (
-          <div className="flex-1 p-8 flex flex-col items-center justify-center">
-            <div
-              {...getRootProps()}
-              className={clsx(
-                'w-full min-w-[700px] max-w-lg aspect-video rounded-2xl max-h-[405px] border-[3px] border-dashed transition-all duration-300 flex flex-col items-center justify-center cursor-pointer group',
-                isDragActive
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-slate-100',
-                state !== 'IDLE' && 'pointer-events-none opacity-50',
-              )}
-            >
-              <input {...getInputProps()} />
+        ) :
+          (
+            <div className="flex-1 p-8 flex flex-col items-center justify-center">
+              <div
+                {...getRootProps()}
+                className={clsx(
+                  'w-full min-w-[700px] max-w-lg aspect-video rounded-2xl max-h-[405px] border-[3px] border-dashed transition-all duration-300 flex flex-col items-center justify-center cursor-pointer group',
+                  isDragActive
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-slate-100',
+                  state !== 'IDLE' && 'pointer-events-none opacity-50',
+                )}
+              >
+                <input {...getInputProps()} />
 
-              {state === 'IDLE' && (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <UploadCloud className="w-8 h-8 text-purple-500" />
+                {state === 'IDLE' && (
+                  <>
+                    <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <UploadCloud className="w-8 h-8 text-purple-500" />
+                    </div>
+                    <p className="text-lg font-semibold text-slate-700">Drop your MP4 here</p>
+                    <p className="text-sm text-slate-400 mt-2">Max size 35MB</p>
+                  </>
+                )}
+
+                {isBusy && (
+                  <div className="flex flex-col items-center animate-pulse">
+                    <Loader2 className="w-10 h-10 text-purple-600 animate-spin mb-4" />
+                    <p className="text-lg font-medium text-slate-700">
+                      {state === 'UPLOADING'
+                        ? 'Uploading video...'
+                        : state === 'GENERATING'
+                          ? 'Generating captions...'
+                          : 'Rendering final video...'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">This might take a moment</p>
                   </div>
-                  <p className="text-lg font-semibold text-slate-700">Drop your MP4 here</p>
-                  <p className="text-sm text-slate-400 mt-2">Max size 35MB</p>
-                </>
-              )}
+                )}
+              </div>
 
-              {isBusy && (
-                <div className="flex flex-col items-center animate-pulse">
-                  <Loader2 className="w-10 h-10 text-purple-600 animate-spin mb-4" />
-                  <p className="text-lg font-medium text-slate-700">
-                    {state === 'UPLOADING'
-                      ? 'Uploading video...'
-                      : state === 'GENERATING'
-                        ? 'Generating captions...'
-                        : 'Rendering final video...'}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-2">This might take a moment</p>
+              {error && (
+                <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium">
+                  {error}
                 </div>
               )}
             </div>
-
-            {error && (
-              <div className="mt-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium">
-                {error}
-              </div>
-            )}
-          </div>
-        )}
+          )}
       </div>
 
       {renderedVideoBlob ? (
@@ -346,6 +348,16 @@ export default function Home() {
             <RefreshCw className="w-4 h-4" />
             Try different file
           </button>
+          
+          {/* Download SRT button */}
+          <button
+            onClick={handleDownloadSrt}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download SRT
+          </button>
+          
           <button
             onClick={handleDownload}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all shadow-lg shadow-purple-200"

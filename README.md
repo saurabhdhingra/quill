@@ -2,6 +2,12 @@
 
 Quill is an application built with Next.js, React, and Remotion that automates the process of transcribing speech from uploaded videos (MP4) and rendering a new video file with dynamic, karaoke-style captions burned directly into the footage.
 
+[Demo Video](https://drive.google.com/file/d/1z9DrLnEEXpIGpRIqixxBjQvSOhF-MTIP/view?usp=share_link)
+
+[Generated Video from demo](https://drive.google.com/file/d/1j5MOOOqwI-WC50MrIk6rIiBB-fiBmRoj/view?usp=share_link)
+
+[Generated .srt file from demo](https://drive.google.com/file/d/1CojY-LNPpqC47ucfX8Ao1_m51nCtVmyR/view?usp=share_link)
+
 ## Prerequisites & Setup
 
 This project requires a specific version of Node.js and uses an external transcription service for the caption generation pipeline.
@@ -36,7 +42,7 @@ npm install
 npm run dev
 ```
 
-The application will now be accessible at 'http://localhost:3000'.
+The application will now be accessible at `http://localhost:3000`.
 
 ## Folder Structure
 

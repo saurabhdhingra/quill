@@ -16,7 +16,7 @@
     "@remotion/cli": "^4.0.377",
     "@remotion/player": "^4.0.377",
     "@remotion/renderer": "^4.0.377",
-    "@remotion/compositor-darwin-arm64": "^4.0.377",
+    "@remotion/compositor-linux-x64-gnu": "^4.0.377",
     "@remotion/install-whisper-cpp": "^4.0.377",
     "@types/uuid": "^11.0.0",
     "assemblyai": "^4.19.0",

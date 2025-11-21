@@ -1,19 +1,11 @@
-export interface AssemblyAIWord {
-    text: string;
-    start: number;
-    end: number;
-    confidence: number;
-    speaker: string | null;
-}
+export type TikTokCaptionPages = ReturnType<
+    typeof import('@remotion/captions')['createTikTokStyleCaptions']
+>['pages'];
 
-export interface CaptionResponse {
-    words: AssemblyAIWord[];
-    status: 'processing' | 'completed' | 'error';
-    text?: string;
-}
+export type TikTokCaptionPage = TikTokCaptionPages[number];
 
-export interface UploadResponse {
-    url: string;      // The signed URL for putting the file
-    publicUrl: string; // The accessible URL for the transcriber
-    filename: string;
+export type Caption = import('@remotion/captions').Caption;
+
+export interface TranscriptionResponse {
+    srt: string;
 }

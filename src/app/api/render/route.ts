@@ -12,9 +12,6 @@ const COMPOSITION_ID = 'CaptionVideo';
 
 export const runtime = 'nodejs';
 
-// ... (utility functions ensurePublicDir, bufferFromFile, parsePositiveNumber, runRenderScript remain the same)
-
-// Utility functions are omitted for brevity in the response, they remain unchanged.
 
 const ensurePublicDir = async () => {
     await fs.mkdir(PUBLIC_RENDER_DIR, { recursive: true });
@@ -88,9 +85,6 @@ export async function POST(request: Request) {
         const staticFilePath = path.posix.join('remotion-inputs', publicFileName).replace(/\\/g, '/');
         const outputLocation = path.join(tmpDir, `${renderId}-captioned.mp4`);
         
-        // -----------------------------------------------------------------------
-        // 💡 CRITICAL CHANGE: Combine custom props into a single JSON object
-        // -----------------------------------------------------------------------
         const customProps = {
             staticSrc: staticFilePath, // Prop name must match component prop (staticSrc)
             pages: pages,               // Prop name must match component prop (pages)
@@ -104,12 +98,11 @@ export async function POST(request: Request) {
             COMPOSITION_ID,
             '--output',
             outputLocation,
-            '--props', // <-- NEW: Use the --props argument
-            JSON.stringify(customProps), // <-- NEW: Pass the JSON string
-            // NOTE: Removed --staticSrc and --pages, as they are now in --props
+            '--props', 
+            JSON.stringify(customProps),
         ];
 
-        // -----------------------------------------------------------------------
+
 
         if (durationOverride) {
             scriptArgs.push('--duration', String(durationOverride));

@@ -9,7 +9,7 @@ import {
 } from '@remotion/install-whisper-cpp';
 
 const WHISPER_CPP_VERSION = process.env.WHISPER_CPP_VERSION ?? '1.5.5';
-const WHISPER_MODEL = process.env.WHISPER_MODEL ?? 'small.en';
+const WHISPER_MODEL = 'small.en';
 const whisperInstallDir = path.join(process.cwd(), '.whisper');
 
 let whisperReadyPromise: Promise<void> | null = null;
@@ -67,7 +67,8 @@ export const transcribeAudioBufferToSrt = async (buffer: Buffer) => {
         const { captions } = toCaptions({
             whisperCppOutput: {
                 ...whisperOutput,
-                transcription: normalizedTranscription,
+                // Use 'any' for the type to avoid the unknown type error if 'TranscriptionItemWithTimestamp' is not defined
+                transcription: normalizedTranscription as any,
             },
         });
         return captionsToSrt(captions);

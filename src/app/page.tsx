@@ -5,10 +5,10 @@ import { useDropzone } from 'react-dropzone';
 import { Loader2, UploadCloud, RefreshCw, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 
-// Corrected imports using relative paths
-import { extractWavFromVideo } from '../lib/client/ffmpeg';
-import { srtToCaptionPages } from '../lib/captions';
-import type { TikTokCaptionPages, TranscriptionResponse } from '../types';
+// CORRECTED IMPORTS: Switched from fragile relative paths (../../) to Next.js path aliases (@/lib)
+import { extractWavFromVideo } from '@/lib/client/ffmpeg';
+import { srtToCaptionPages } from '@/lib/captions';
+import type { TikTokCaptionPages, TranscriptionResponse } from '@/types';
 
 const fontStyles = {
   playfair: { fontFamily: '"Playfair Display", serif' },
@@ -34,23 +34,6 @@ const getVideoDuration = (url: string) =>
     video.onerror = () => reject(new Error('Unable to read video metadata.'));
   });
 
-const base64ToBlob = (base64: string, mimeType: string) => {
-  const byteCharacters = atob(base64);
-  const buffers: ArrayBuffer[] = [];
-
-  for (let offset = 0; offset < byteCharacters.length; offset += 1024) {
-    const slice = byteCharacters.slice(offset, offset + 1024);
-    const byteNumbers = new Array(slice.length);
-    for (let i = 0; i < slice.length; i += 1) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    buffers.push(byteArray.buffer);
-  }
-
-  return new Blob(buffers, { type: mimeType });
-};
-
 const triggerDownload = (url: string, filename: string) => {
   const link = document.createElement('a');
   link.href = url;
@@ -64,9 +47,10 @@ export default function Home() {
   const [state, setState] = useState<AppState>('IDLE');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
-  const [renderedVideoBlob, setRenderedVideoBlob] = useState<Blob | null>(null);
+  // We no longer store the blob, only the public URL
+  // const [renderedVideoBlob, setRenderedVideoBlob] = useState<Blob | null>(null); 
   const [captionPages, setCaptionPages] = useState<TikTokCaptionPages>([]);
-  const [srtContent, setSrtContent] = useState<string | null>(null); // State for storing the SRT content
+  const [srtContent, setSrtContent] = useState<string | null>(null); 
   const [durationInFrames, setDurationInFrames] = useState(FPS * 60);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,9 +64,7 @@ export default function Home() {
   }, []);
   const updateRenderedUrl = useCallback((nextUrl: string | null) => {
     setRenderedVideoUrl((prev) => {
-      if (prev) {
-        URL.revokeObjectURL(prev);
-      }
+      // No longer revoking object URLs since the new URL is an S3 URL, not a local Blob URL
       return nextUrl;
     });
   }, []);
@@ -92,11 +74,9 @@ export default function Home() {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
       }
-      if (renderedVideoUrl) {
-        URL.revokeObjectURL(renderedVideoUrl);
-      }
+      // No need to revoke renderedVideoUrl if it's an S3 URL
     };
-  }, [previewUrl, renderedVideoUrl]);
+  }, [previewUrl]); // Removed renderedVideoUrl from dependency array
 
   const renderFinalVideo = useCallback(
     async (file: File, srt: string, frames: number) => {
@@ -108,20 +88,24 @@ export default function Home() {
       formData.append('fps', String(FPS));
       formData.append('width', String(WIDTH));
       formData.append('height', String(HEIGHT));
+      
       const response = await fetch('/api/render', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to render video with captions.');
+        // The API now returns a structured error message
+        const errorPayload = await response.json();
+        throw new Error(errorPayload.error || 'Failed to render video with captions (Lambda error).');
       }
 
-      const payload = (await response.json()) as { video: string; mimeType?: string };
-      const blob = base64ToBlob(payload.video, payload.mimeType ?? 'video/mp4');
-      const finalUrl = URL.createObjectURL(blob);
-
-      setRenderedVideoBlob(blob);
+      // The new payload returns the public S3 video URL
+      const payload = (await response.json()) as { success: boolean; videoUrl: string };
+      
+      const finalUrl = payload.videoUrl; // Directly use the S3 URL
+      
+      // We no longer set the blob, only the URL
       updateRenderedUrl(finalUrl);
       setState('READY');
     },
@@ -132,8 +116,7 @@ export default function Home() {
     async (file: File) => {
       setError(null);
       setCaptionPages([]);
-      setSrtContent(null); // Reset SRT content
-      setRenderedVideoBlob(null);
+      setSrtContent(null); 
       updateRenderedUrl(null);
       setState('UPLOADING');
 
@@ -171,11 +154,11 @@ export default function Home() {
         }
 
         const payload = (await transcriptionResponse.json()) as TranscriptionResponse;
-        const { srt } = payload; // Destructure srt
+        const { srt } = payload; 
         const { pages } = srtToCaptionPages(srt);
         
         setCaptionPages(pages);
-        setSrtContent(srt); // Store the SRT content
+        setSrtContent(srt); 
         
         await renderFinalVideo(file, srt, computedFrames);
       } catch (processingError) {
@@ -189,8 +172,7 @@ export default function Home() {
         updatePreviewUrl(null);
         updateRenderedUrl(null);
         setCaptionPages([]);
-        setSrtContent(null); // Reset SRT content on error
-        setRenderedVideoBlob(null);
+        setSrtContent(null); 
       }
     },
     [renderFinalVideo, updatePreviewUrl, updateRenderedUrl],
@@ -216,8 +198,7 @@ export default function Home() {
 
   const handleReset = () => {
     setCaptionPages([]);
-    setSrtContent(null); // Reset SRT content
-    setRenderedVideoBlob(null);
+    setSrtContent(null); 
     setError(null);
     setState('IDLE');
     updatePreviewUrl(null);
@@ -225,20 +206,15 @@ export default function Home() {
   };
 
   const handleDownload = () => {
-    if (!renderedVideoBlob) {
+    if (!renderedVideoUrl) { 
       return;
     }
 
-    if (renderedVideoUrl) {
-      triggerDownload(renderedVideoUrl, 'captioned-video.mp4');
-      return;
-    }
-
-    const tempUrl = URL.createObjectURL(renderedVideoBlob);
-    triggerDownload(tempUrl, 'captioned-video.mp4');
-    URL.revokeObjectURL(tempUrl);
+    // Since renderedVideoUrl is now the public S3 URL, we pass it directly
+    triggerDownload(renderedVideoUrl, 'captioned-video.mp4');
   };
   
+  // Function to download the SRT file
   const handleDownloadSrt = () => {
     if (!srtContent) {
       return;
@@ -338,7 +314,7 @@ export default function Home() {
           )}
       </div>
 
-      {renderedVideoBlob ? (
+      {renderedVideoUrl ? ( // Check for URL instead of blob
         <div className="p-6 border-t border-slate-100 flex gap-4 justify-center">
           <button
             onClick={handleReset}

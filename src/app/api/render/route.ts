@@ -1,26 +1,61 @@
 import { NextResponse } from 'next/server';
-import path from 'node:path';
-import os from 'node:os';
-import { randomUUID } from 'node:crypto';
-import { promises as fs } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto'; // Keeping for unique IDs
 import { srtToCaptionPages } from '@/lib/captions';
 
-const REMOTION_ENTRY = path.join(process.cwd(), 'src', 'remotion', 'index.tsx');
-const PUBLIC_RENDER_DIR = path.join(process.cwd(), 'public', 'remotion-inputs');
+// Required for Remotion Lambda and S3 operations
+import { renderMediaOnLambda, getRenderProgress, AwsRegion } from '@remotion/lambda/client';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+// REMOVED: import { getMetadata } from '@remotion/media-utils'; to fix "use client" error.
+
+// --- Environment Variables ---
+const REGION = process.env.AWS_REGION as string;
+const FUNCTION_NAME = process.env.REMOTION_FUNCTION_NAME as string;
+const BUCKET_NAME = process.env.REMOTION_BUCKET as string;
+// CRITICAL FIX: Added environment variable for the Remotion bundle URL
+const SERVE_URL = process.env.REMOTION_SERVE_URL as string;
+// CRITICAL: Must match the ID defined in RemotionRoot.tsx
 const COMPOSITION_ID = 'CaptionVideo';
 
-export const runtime = 'nodejs';
+// Default values since we can't probe metadata now
+const DEFAULT_WIDTH = 1080;
+const DEFAULT_HEIGHT = 720;
+const DEFAULT_FPS = 30;
+const DEFAULT_DURATION_FRAMES = DEFAULT_FPS * 30; // Default to 30 seconds
 
+// Helper function to validate required environment variables
+function validateEnv() {
+    // CRITICAL FIX: Added SERVE_URL validation
+    if (!REGION || !FUNCTION_NAME || !BUCKET_NAME || !SERVE_URL) {
+        const missing = [];
+        if (!REGION) missing.push('AWS_REGION');
+        if (!FUNCTION_NAME) missing.push('REMOTION_FUNCTION_NAME');
+        if (!BUCKET_NAME) missing.push('REMOTION_BUCKET');
+        if (!SERVE_URL) missing.push('REMOTION_SERVE_URL'); // New required variable
 
-const ensurePublicDir = async () => {
-    await fs.mkdir(PUBLIC_RENDER_DIR, { recursive: true });
-};
+        console.error('Missing Remotion Lambda configuration:', missing.join(', '));
+        throw new Error(`Lambda configuration error: Missing environment variables: ${missing.join(', ')}`);
+    }
+}
 
-const bufferFromFile = async (file: File) => {
-    const arrayBuffer = await file.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-};
+// Helper to upload the video file to S3
+async function uploadFileToS3(file: File, key: string, bucket: string, region: string): Promise<string> {
+    // Note: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are read automatically from environment
+    const s3Client = new S3Client({ region });
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+    const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: fileBuffer,
+        ContentType: file.type,
+        ACL: 'public-read' // Ensures the Lambda can access the video
+    });
+
+    await s3Client.send(command);
+
+    // Construct the public URL for the video in S3
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+}
 
 const parsePositiveNumber = (value: FormDataEntryValue | null) => {
     if (typeof value !== 'string') {
@@ -30,29 +65,12 @@ const parsePositiveNumber = (value: FormDataEntryValue | null) => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-const runRenderScript = (args: string[]) =>
-    new Promise<void>((resolve, reject) => {
-        const scriptPath = path.join(process.cwd(), 'scripts', 'render-caption-video.cjs');
-        const child = spawn(process.execPath, [scriptPath, ...args], {
-            stdio: 'inherit',
-        });
-
-        child.on('error', reject);
-        child.on('exit', (code) => {
-            if (code === 0) {
-                resolve();
-            } else {
-                reject(new Error(`Renderer script exited with code ${code}`));
-            }
-        });
-    });
 
 export async function POST(request: Request) {
-    let tmpDir: string | null = null;
-    let publicFilePath: string | null = null;
 
     try {
-        await ensurePublicDir();
+        // 1. Validate environment
+        validateEnv();
 
         const formData = await request.formData();
         const videoFile = formData.get('video');
@@ -71,68 +89,107 @@ export async function POST(request: Request) {
         const widthOverride = parsePositiveNumber(formData.get('width'));
         const heightOverride = parsePositiveNumber(formData.get('height'));
 
+        // 2. Prepare data and upload video to S3
         const { pages } = srtToCaptionPages(srt);
         const renderId = randomUUID();
-        tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'quill-render-'));
 
-        const uploadedVideoPath = path.join(tmpDir, `${renderId}-input.mp4`);
-        await fs.writeFile(uploadedVideoPath, await bufferFromFile(videoFile));
+        const videoS3Key = `input-videos/${renderId}-${videoFile.name}`;
+        const videoS3Url = await uploadFileToS3(videoFile, videoS3Key, BUCKET_NAME, REGION);
 
-        const publicFileName = `${renderId}.mp4`;
-        publicFilePath = path.join(PUBLIC_RENDER_DIR, publicFileName);
-        await fs.copyFile(uploadedVideoPath, publicFilePath);
+        console.log(`Video uploaded to S3: ${videoS3Url}`);
 
-        const staticFilePath = path.posix.join('remotion-inputs', publicFileName).replace(/\\/g, '/');
-        const outputLocation = path.join(tmpDir, `${renderId}-captioned.mp4`);
-        
+        // --- TEMPORARILY USING DEFAULTS TO FIX "USE CLIENT" ERROR ---
+
+        const videoFps = fpsOverride || DEFAULT_FPS;
+        const videoDurationInFrames = durationOverride || DEFAULT_DURATION_FRAMES;
+        const videoWidth = widthOverride || DEFAULT_WIDTH;
+        const videoHeight = heightOverride || DEFAULT_HEIGHT;
+        // --- END TEMPORARILY USING DEFAULTS ---
+
+        // 3. Define Input Props for Remotion Composition
         const customProps = {
-            staticSrc: staticFilePath, // Prop name must match component prop (staticSrc)
-            pages: pages,               // Prop name must match component prop (pages)
-            useStaticFile: true,        // Recommended to be explicit
+            staticSrc: videoS3Url, // The URL must be passed to the Remotion component
+            pages: pages,          // Prop name must match component prop (pages)
         };
 
-        const scriptArgs = [
-            '--entry',
-            REMOTION_ENTRY,
-            '--composition',
-            COMPOSITION_ID,
-            '--output',
-            outputLocation,
-            '--props', 
-            JSON.stringify(customProps),
-        ];
+        // 4. Start the rendering job on AWS Lambda
+        console.log(`Starting Lambda render job for composition: ${COMPOSITION_ID}`);
+
+        const { renderId: lambdaRenderId } = await renderMediaOnLambda({
+            region: REGION as AwsRegion,
+            functionName: FUNCTION_NAME,
+            // CRITICAL FIX: Pass the serveUrl so Lambda can fetch the bundle
+            serveUrl: SERVE_URL,
+            composition: COMPOSITION_ID,
+            inputProps: customProps,
 
 
 
-        if (durationOverride) {
-            scriptArgs.push('--duration', String(durationOverride));
-        }
-        if (fpsOverride) {
-            scriptArgs.push('--fps', String(fpsOverride));
-        }
-        if (widthOverride) {
-            scriptArgs.push('--width', String(widthOverride));
-        }
-        if (heightOverride) {
-            scriptArgs.push('--height', String(heightOverride));
-        }
 
-        await runRenderScript(scriptArgs);
+            forceWidth: videoWidth,
+            forceHeight: videoHeight,
 
-        const renderedVideo = await fs.readFile(outputLocation);
-        const base64 = renderedVideo.toString('base64');
+            // Configuration for the output
+            codec: 'h264',
+            imageFormat: 'jpeg',
+            logLevel: 'verbose',
+            // Set to a unique key in the bucket for the final output
+            outName: `output-videos/${renderId}-captioned.mp4`
 
-        return NextResponse.json({
-            video: base64,
-            mimeType: 'video/mp4',
         });
+
+        // 5. Poll for status (This is required since we cannot keep a Vercel function running for long)
+        let isDone = false;
+        let finalOutputUrl = '';
+
+        // Define max wait time (e.g., 90 seconds, well within Vercel's limit)
+        const MAX_WAIT_TIME_MS = 90000;
+        const POLL_INTERVAL_MS = 3000;
+        let elapsed = 0;
+
+        while (!isDone && elapsed < MAX_WAIT_TIME_MS) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+            elapsed += POLL_INTERVAL_MS;
+
+            const progress = await getRenderProgress({
+                // Ensure region is the correct enum/string literal for Remotion Lambda Client
+                region: REGION as any, // You might want a runtime/map for strict regions
+                bucketName: BUCKET_NAME,
+                renderId: lambdaRenderId,
+                functionName: FUNCTION_NAME,
+            });
+
+            // "progress.progress" does not exist—per Remotion, use "progress.overallProgress" (0-1 number)
+            // Also, Remotion may provide outputFile at progress.outputFile if done.
+            const percent = progress.overallProgress !== undefined
+                ? Math.round(progress.overallProgress * 100)
+                : 0;
+            console.log(`Render Progress: ${percent}% (${elapsed / 1000}s elapsed)`);
+
+            if (progress.overallProgress === 1 && progress.outputFile) {
+                isDone = true;
+                finalOutputUrl = progress.outputFile;
+            } else if (progress.overallProgress === 0 && progress.fatalErrorEncountered) {
+                throw new Error(`Lambda Render Failed: ${progress.fatalErrorEncountered}`);
+            }
+        }
+
+        if (!isDone) {
+            throw new Error('Rendering timed out while waiting for Lambda result.');
+        }
+
+        // 6. Return the final video URL (which is an S3 public URL)
+        return NextResponse.json({
+            success: true,
+            message: 'Video rendering complete.',
+            videoUrl: finalOutputUrl // Client will need to fetch this URL
+        }, { status: 200 });
+
     } catch (error) {
-        console.error('Video render failed:', error);
-        return NextResponse.json({ error: 'Video render failed.' }, { status: 500 });
-    } finally {
-        await Promise.all([
-            tmpDir ? fs.rm(tmpDir, { recursive: true, force: true }) : Promise.resolve(),
-            publicFilePath ? fs.rm(publicFilePath, { force: true }) : Promise.resolve(),
-        ]);
+        console.error('Lambda Render Error:', error);
+        return NextResponse.json({
+            success: false,
+            error: `Video render failed on Lambda. Detail: ${error instanceof Error ? error.message : 'Unknown error.'}`
+        }, { status: 500 });
     }
 }

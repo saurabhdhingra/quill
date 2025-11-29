@@ -15,7 +15,7 @@
     "@google-cloud/storage": "^7.17.3",
     "@remotion/captions": "4.0.377",
     "@remotion/cli": "4.0.377",
-    "@remotion/compositor-linux-x64": "4.0.377",
+    "@remotion/compositor-linux-arm64-musl": "4.0.377",
     "@remotion/install-whisper-cpp": "4.0.377",
     "@remotion/lambda": "4.0.377",
     "@remotion/media-utils": "4.0.377",

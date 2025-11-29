@@ -1,44 +1,55 @@
-import type { NextConfig } from "next";
-
 const nextConfig = {
-  // We need to configure webpack to ensure Next.js does not bundle 
-  // Remotion's native dependencies, as we are using Remotion Lambda (serverless) 
-  // and do not require local rendering binaries.
+  // 1. TURBOPACK/CLIENT-SIDE FIX
+  experimental: {
+    appDir: true,
+    serverComponentsExternalPackages: ["@remotion/ffmpeg", "@ffmpeg/ffmpeg", "@ffmpeg/util"],
+    // Explicitly disabling Turbopack in development to ensure Webpack is used for Remotion's custom bundling needs.
+    isRSC: false, 
+  },
+  
+  // 2. SERVER-SIDE EXTERNALIZATION FIX (Prevents bundling Node-native code used by Remotion Lambda)
   webpack: (config, { isServer }) => {
     // Only apply externalization logic during server-side compilation
     if (isServer) {
-      // 1. Mark native Remotion and related tools as external.
-      // This prevents the Next.js Webpack from processing Node-specific and 
-      // internal Remotion dependencies, which causes the React.createContext error.
+      // Ensure the externals array is initialized
+      if (!config.externals) {
+        config.externals = [];
+      }
+      
+      // Mark native Remotion and related tools as external.
       config.externals.push(
-        // Remotion Compositor dependencies (already there)
+        // Remotion Compositor dependencies
         /@remotion\/compositor-(.*)/, 
-        // Other dependencies being bundled unexpectedly (already there)
+        // Core dependencies often bundled by mistake
         'prettier',
-        // FIX: Externalize esbuild (already there)
         'esbuild',
-        // FIX: Externalize recast and babylon (already there)
         'recast',
         'babylon',
-        // CRITICAL FIX: Externalize Remotion's internal bundler and related React-touching packages.
+        // Critical packages that must remain external in a serverless environment
         '@remotion/bundler',
         'webpack',
-        'fs-extra', // Often causes issues when bundled
-        'bufferutil', // Node-native utilities
-        'utf-8-validate' // Node-native utilities
+        'fs-extra', 
+        'bufferutil', 
+        'utf-8-validate', 
       );
       
-      // 2. Add a rule to handle problematic file types (like .md and native binaries) 
-      // found inside packages like @esbuild, preventing 'Unknown module type' and 
-      // 'failed to convert rope into string' errors.
+      // Add a rule to handle problematic file types (like .md and native binaries)
       config.module.rules.push({
         test: /\.(md|bin|dat|node)$/,
-        use: 'raw-loader', // Treat these files as raw content, not JS modules.
+        use: 'raw-loader', // Requires 'raw-loader' to be installed (npm install raw-loader)
       });
+      
+      // Ensure Node-specific file system modules are properly handled/ignored
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false, 
+        path: false, 
+        os: false, 
+      };
     }
 
     return config;
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

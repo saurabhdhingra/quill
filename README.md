@@ -68,7 +68,7 @@ The project follows a standard Next.js app directory structure, with key logic s
 
 The application uses a three-stage pipeline to generate the final captioned video:
 
-1.** Audio Extraction (Client-Side/FFmpeg):**
+1.**Audio Extraction (Client-Side/FFmpeg):**
 
     - The user uploads an MP4 video file in 'src/app/page.tsx'.
 
